@@ -38,7 +38,7 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
         self._token: str | None = None
         self._token_expires: datetime | None = None
 
-        update_interval = timedelta(seconds=entry.data.get("update_interval", 60))
+        update_interval = timedelta(seconds=entry.data.get("update_interval", 7200))
         super().__init__(
             hass,
             _LOGGER,

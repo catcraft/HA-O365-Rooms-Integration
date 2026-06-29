@@ -48,7 +48,7 @@ class PhnRoomCalendarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_TENANT_ID): str,
             vol.Required(CONF_CLIENT_ID): str,
             vol.Required(CONF_CLIENT_SECRET): str,
-            vol.Required(CONF_ROOMS, default="showroom@PHN.onmicrosoft.com, phn-kinosaal@phnetworks.ch"): str,
+            vol.Required(CONF_ROOMS, default="room1@domain.com, room2@domain.com"): str,
             vol.Optional(CONF_TIMEZONE, default=DEFAULT_TIMEZONE): str,
             vol.Optional(CONF_LOOKAHEAD_DAYS, default=DEFAULT_LOOKAHEAD_DAYS): int,
             vol.Optional(CONF_MAX_EVENTS, default=DEFAULT_MAX_EVENTS): int,

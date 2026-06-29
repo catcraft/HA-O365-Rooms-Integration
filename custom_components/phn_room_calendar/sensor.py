@@ -13,7 +13,6 @@ from .coordinator import GraphRoomCalendarCoordinator
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = GraphRoomCalendarCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
 
     entities = [AllRoomsNextMeetingSensor(coordinator, entry)]
     for room in entry.data[CONF_ROOMS]:
