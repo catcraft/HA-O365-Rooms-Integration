@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+
 from .const import DOMAIN
 from .coordinator import GraphRoomCalendarCoordinator
 
-PLATFORMS = ["sensor", "button"]
+PLATFORMS = ["sensor", "binary_sensor", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -16,20 +18,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         await coordinator.async_config_entry_first_refresh()
     except Exception as err:
-        raise ConfigEntryNotReady(f"Failed to fetch data: {err}")
+        raise ConfigEntryNotReady(f"Failed to fetch data: {err}") from err
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
-
-    # optional: Service behalten
-    async def handle_update(call):
-        await coordinator.async_request_refresh()
-
-    if not hass.services.has_service(DOMAIN, "update"):
-        hass.services.async_register(
-            DOMAIN,
-            "update",
-            handle_update
-        )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -37,4 +28,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+
+    return unload_ok

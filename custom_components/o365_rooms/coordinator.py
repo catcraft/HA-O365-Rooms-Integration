@@ -38,8 +38,6 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
         self.client_id = entry.data[CONF_CLIENT_ID]
         self.client_secret = entry.data[CONF_CLIENT_SECRET]
 
-        # New config uses one room mailbox.
-        # Legacy fallback supports old entries with "rooms".
         self.room = self._get_room_from_entry(entry)
 
         self.lookahead_days = entry.data[CONF_LOOKAHEAD_DAYS]
@@ -57,7 +55,10 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
             _LOGGER,
             name=f"{DOMAIN}_{self.room}",
             update_interval=timedelta(
-                seconds=entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+                seconds=entry.data.get(
+                    CONF_UPDATE_INTERVAL,
+                    DEFAULT_UPDATE_INTERVAL,
+                )
             ),
         )
 
@@ -65,7 +66,6 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
         if CONF_ROOM in entry.data:
             return entry.data[CONF_ROOM]
 
-        # Legacy fallback for old multi-room config.
         rooms = entry.data.get(CONF_ROOMS, [])
         if isinstance(rooms, list) and rooms:
             return rooms[0]
@@ -79,6 +79,7 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
             return self._token
 
         url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+
         payload = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
@@ -107,7 +108,7 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
 
         return dt.astimezone(self.tz)
 
-    def _format_event(self, ev: dict, now: datetime) -> dict:
+    def _format_event(self, ev: dict) -> dict:
         start = self._parse_dt(ev["start"]["dateTime"])
         end = self._parse_dt(ev["end"]["dateTime"])
 
@@ -119,7 +120,6 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
             "date": start.date().isoformat(),
             "start_time": start.strftime("%H:%M"),
             "end_time": end.strftime("%H:%M"),
-            "occupied": start <= now < end,
         }
 
     async def _fetch_calendar_view(
@@ -127,7 +127,6 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
         token: str,
         start: datetime,
         end: datetime,
-        now: datetime,
     ) -> list[dict]:
         headers = {
             "Authorization": f"Bearer {token}",
@@ -141,7 +140,10 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
             "$orderby": "start/dateTime asc",
         }
 
-        url = f"https://graph.microsoft.com/v1.0/users/{quote(self.room)}/calendar/calendarView"
+        url = (
+            f"https://graph.microsoft.com/v1.0/users/"
+            f"{quote(self.room)}/calendar/calendarView"
+        )
 
         events = []
         first_request = True
@@ -163,65 +165,33 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
                 if ev.get("isCancelled"):
                     continue
 
-                events.append(self._format_event(ev, now))
+                events.append(self._format_event(ev))
 
             url = data.get("@odata.nextLink")
 
         events.sort(key=lambda item: item["start_iso"])
+
         return events
 
     async def _async_update_data(self):
         token = await self._async_get_token()
         now = datetime.now(self.tz)
 
-        past_start = now - timedelta(days=self.past_days)
-        future_end = now + timedelta(days=self.lookahead_days)
+        start = now - timedelta(days=self.past_days)
+        end = now + timedelta(days=self.lookahead_days)
 
-        past_events = await self._fetch_calendar_view(
+        events = await self._fetch_calendar_view(
             token=token,
-            start=past_start,
-            end=now,
-            now=now,
+            start=start,
+            end=end,
         )
 
-        future_events = await self._fetch_calendar_view(
-            token=token,
-            start=now,
-            end=future_end,
-            now=now,
-        )
-
-        # filter future
-        future_events = [
-            event for event in future_events
-            if event["end_iso"] > now.isoformat()
-        ]
-
-        current_event = None
-        future_upcoming = []
-        past_ended = []
-
-        for event in future_events:
-            if event["occupied"]:
-                current_event = event
-            else:
-                future_upcoming.append(event)
-
-        for event in past_events:
-            if event["end_iso"] <= now.isoformat():
-                past_ended.append(event)
-
-        future_upcoming.sort(key=lambda e: e["start_iso"])
-        past_ended.sort(key=lambda e: e["end_iso"])
-
-        next_event = future_upcoming[0] if future_upcoming else None
-        last_event = past_ended[-1] if past_ended else None
-
-        return {
+        result = {
             "room": self.room,
-            "current": current_event,
-            "next": next_event,
-            "last": last_event,
-            "occupied": current_event is not None,
-            "last_update": now.isoformat(),
+            "events": events,
+            "graph_last_update": now.isoformat(),
         }
+
+        _LOGGER.debug("O365 room calendar graph result for %s: %s", self.room, result)
+
+        return result
