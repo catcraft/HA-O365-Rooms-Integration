@@ -1,37 +1,32 @@
 from __future__ import annotations
-
-import logging
-
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
+from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities,
-):
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([RoomCalendarSensor(coordinator, entry)])
+
+    async_add_entities([
+        RoomCurrentSensor(coordinator, entry),
+        RoomNextSensor(coordinator, entry),
+        RoomLastSensor(coordinator, entry),
+    ])
 
 
-class RoomCalendarSensor(CoordinatorEntity, SensorEntity):
+class BaseRoomSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
-    _attr_icon = "mdi:calendar-clock"
 
-    def __init__(self, coordinator, entry: ConfigEntry):
+    def __init__(self, coordinator, entry, key, name):
         super().__init__(coordinator)
-
         self.entry = entry
-        self._attr_unique_id = f"{entry.entry_id}_next_meeting"
-        self._attr_name = "Next Meeting"
+        self.key = key
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        self._attr_icon = "mdi:calendar"
 
     @property
     def device_info(self):
@@ -42,45 +37,65 @@ class RoomCalendarSensor(CoordinatorEntity, SensorEntity):
             model="Microsoft Graph Room Calendar",
         )
 
+    def _get_event(self):
+        data = self.coordinator.data or {}
+        return data.get(self.key)
+
+
+class RoomCurrentSensor(BaseRoomSensor):
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry, "current", "Current Meeting")
+
     @property
     def native_value(self):
-        data = self.coordinator.data or {}
-        next_event = data.get("next")
-
-        if not data:
-            _LOGGER.warning("Coordinator data is empty")
-            return "No data"
-
-        return next_event["subject"] if next_event else "No upcoming meeting"
+        event = self._get_event()
+        return event["subject"] if event else "Kein aktives Meeting"
 
     @property
     def extra_state_attributes(self):
-        data = self.coordinator.data or {}
-
-        next_event = data.get("next")
-        last_event = data.get("last")
-
+        event = self._get_event()
+        if not event:
+            return {}
         return {
-            "room": data.get("room"),
-            "occupied": data.get("occupied", False),
+            "start": event["start_iso"],
+            "end": event["end_iso"],
+        }
 
-            "next": next_event,
-            "next_subject": next_event.get("subject") if next_event else None,
-            "next_date": next_event.get("date") if next_event else None,
-            "next_start": next_event.get("start_time") if next_event else None,
-            "next_end": next_event.get("end_time") if next_event else None,
-            "next_start_iso": next_event.get("start_iso") if next_event else None,
-            "next_end_iso": next_event.get("end_iso") if next_event else None,
 
-            "last": last_event,
-            "last_subject": last_event.get("subject") if last_event else None,
-            "last_date": last_event.get("date") if last_event else None,
-            "last_start": last_event.get("start_time") if last_event else None,
-            "last_end": last_event.get("end_time") if last_event else None,
-            "last_start_iso": last_event.get("start_iso") if last_event else None,
-            "last_end_iso": last_event.get("end_iso") if last_event else None,
+class RoomNextSensor(BaseRoomSensor):
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry, "next", "Next Meeting")
 
-            "events": data.get("events", []),
-            "past_events": data.get("past_events", []),
-            "last_update": data.get("last_update"),
+    @property
+    def native_value(self):
+        event = self._get_event()
+        return event["subject"] if event else None
+
+    @property
+    def extra_state_attributes(self):
+        event = self._get_event()
+        if not event:
+            return {}
+        return {
+            "start": event["start_iso"],
+            "end": event["end_iso"],
+        }
+
+
+class RoomLastSensor(BaseRoomSensor):
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry, "last", "Last Meeting")
+
+    @property
+    def native_value(self):
+        event = self._get_event()
+        return event["subject"] if event else None
+
+    @property
+    def extra_state_attributes(self):
+        event = self._get_event()
+        if not event:
+            return {}
+        return {
+            "end": event["end_iso"],
         }

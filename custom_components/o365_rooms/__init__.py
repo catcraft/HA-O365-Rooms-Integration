@@ -1,13 +1,11 @@
 from __future__ import annotations
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-
 from .const import DOMAIN
 from .coordinator import GraphRoomCalendarCoordinator
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -22,6 +20,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
+    # optional: Service behalten
     async def handle_update(call):
         await coordinator.async_request_refresh()
 

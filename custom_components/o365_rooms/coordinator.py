@@ -172,7 +172,6 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         token = await self._async_get_token()
-
         now = datetime.now(self.tz)
 
         past_start = now - timedelta(days=self.past_days)
@@ -192,31 +191,37 @@ class GraphRoomCalendarCoordinator(DataUpdateCoordinator):
             now=now,
         )
 
-        # Future means active now or upcoming.
+        # filter future
         future_events = [
             event for event in future_events
             if event["end_iso"] > now.isoformat()
         ]
 
-        # Last means already ended.
-        ended_events = [
-            event for event in past_events
-            if event["end_iso"] <= now.isoformat()
-        ]
+        current_event = None
+        future_upcoming = []
+        past_ended = []
 
-        next_event = future_events[0] if future_events else None
-        last_event = ended_events[-1] if ended_events else None
+        for event in future_events:
+            if event["occupied"]:
+                current_event = event
+            else:
+                future_upcoming.append(event)
 
-        result = {
+        for event in past_events:
+            if event["end_iso"] <= now.isoformat():
+                past_ended.append(event)
+
+        future_upcoming.sort(key=lambda e: e["start_iso"])
+        past_ended.sort(key=lambda e: e["end_iso"])
+
+        next_event = future_upcoming[0] if future_upcoming else None
+        last_event = past_ended[-1] if past_ended else None
+
+        return {
             "room": self.room,
+            "current": current_event,
             "next": next_event,
             "last": last_event,
-            "events": future_events[: self.max_events],
-            "past_events": ended_events[-self.max_events :],
-            "occupied": any(event["occupied"] for event in future_events),
+            "occupied": current_event is not None,
             "last_update": now.isoformat(),
         }
-
-        _LOGGER.debug("O365 room calendar result for %s: %s", self.room, result)
-
-        return result
