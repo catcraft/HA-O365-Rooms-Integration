@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "O365 Rooms Calendar",
+        "description": "Connect Microsoft Graph room mailboxes and create Home Assistant sensors for the next meetings.",
+        "data": {
+          "name": "Name",
+          "tenant_id": "Tenant ID",
+          "client_id": "Client ID",
+          "client_secret": "Client Secret",
+          "rooms": "Room mailboxes, comma separated",
+          "timezone": "Timezone",
+          "lookahead_days": "Lookahead days",
+          "max_events": "Max events per sensor",
+          "update_interval": "Update interval in seconds"
+        }
+      }
+    },
+    "error": {
+      "rooms_required": "Please enter at least one room mailbox."
+    }
+  }
+}
