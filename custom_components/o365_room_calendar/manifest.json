@@ -1,6 +1,6 @@
 {
   "domain": "o365_rooms",
-  "name": "O365 Rooms Calendar",
+  "name": "O365 Room Calendar",
   "codeowners": ["@catcraft"],
   "documentation": "https://github.com/catcraft/HA-O365-Rooms-Integration",
   "issue_tracker": "https://github.com/catcraft/HA-O365-Rooms-Integration/issues",
@@ -8,5 +8,5 @@
   "dependencies": [],
   "iot_class": "cloud_polling",
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
